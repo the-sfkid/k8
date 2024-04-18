@@ -1,0 +1,47 @@
+- hosts: localhost
+  tasks: 
+    - name: Install python3-pip (if not already installed)
+      become: yes
+      package:
+        name: python3-pip
+        state: present
+
+    - name: Install docker Python library
+      pip:
+        name: docker
+        state: present
+      become: yes
+      vars:
+        ansible_python_interpreter: /usr/bin/python3
+
+    - name: remove the running image
+      command: docker rmi customimage
+      ignore_errors: true
+
+    - name: Create the image from Docker file
+      command: docker build -t customimage .
+
+    - name: Log in to Docker Hub
+      command: docker login -u thesfkid -p jithin+7012
+      become: yes
+
+    - name: Tag the local Docker image
+      command: docker tag customimage:latest thesfkid/customimage:latest
+      become: yes
+
+    - name: Push the Docker image to Docker Hub
+      command: docker push thesfkid/customimage:latest
+      become: yes
+
+- hosts: 172.31.2.218
+  become: yes
+  gather_facts: no  
+  tasks:
+    - name: Create a deployment
+      command: kubectl apply -f /root/deployment.yaml
+
+    - name: Create a service
+      command: kubectl apply -f /root/service.yaml
+
+    - name: Update deployment with new pods if image updated in Docker Hub
+      command: kubectl rollout restart customimage
